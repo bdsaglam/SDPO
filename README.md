@@ -185,23 +185,30 @@ The detailed instructions for loading the data are provided in `data/README.md`.
 
 One example is provided below:
 ```bash
-python data/load_dataset.py \
+PYTHONPATH=. python data/load_dataset.py \
     --dataset_name Chemistry \
     --output_path datasets/sciknoweval/chemistry.json
 ```
 
 To split the data into train and test sets, run the following command:
 ```bash
-python data/split_tasks.py \
+PYTHONPATH=. python data/split_tasks.py \
     --json_path datasets/sciknoweval/chemistry.json \
     --output_dir datasets/sciknoweval/chemistry \
     --test_ratio 0.1 \
     --seed 42
 ```
 
-For `LiveCodeBenchv6` split the _unit tests_ into train and test sets, run the following command:
+For `LiveCodeBenchv6`, first load the dataset:
 ```bash
-python data/split_tests.py \
+PYTHONPATH=. python data/load_dataset.py \
+    --dataset_name livecodebench/code_generation_lite-v6 \
+    --output_path datasets/lcb_v6.json
+```
+
+Then split the _unit tests_ into train and test sets:
+```bash
+PYTHONPATH=. python data/split_tests.py \
     --json_path datasets/lcb_v6.json \
     --output_dir datasets/lcb_v6
 ```
