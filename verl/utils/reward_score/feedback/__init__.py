@@ -3,6 +3,7 @@ from verl.utils.reward_score.feedback import code
 from verl.utils.reward_score.feedback import gpqa
 from verl.utils.reward_score.feedback import mcq
 from verl.utils.reward_score.feedback import tooluse
+from verl.utils.reward_score.feedback import arc_agi
 
 
 def compute_score(
@@ -21,6 +22,8 @@ def compute_score(
         results = mcq.compute_score(solution_str, ground_truth)
     elif data_source in ["tooluse"]:
         results = tooluse.compute_score(solution_str, ground_truth)
+    elif data_source in ["arc_agi"]:
+        results = arc_agi.compute_score(solution_str, ground_truth, extra_info)
     else:
         raise ValueError(f"Reward style {data_source} not found.")
     return results

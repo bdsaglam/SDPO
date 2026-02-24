@@ -62,7 +62,7 @@ def make_map_fn(split: str):
             data_source = example.pop("dataset")
             elo = example.pop("elo")
 
-            if reward_style == "code":
+            if reward_style in ("code", "arc_agi"):
                 solution = tests
 
             # remove 'self' from method signature if present

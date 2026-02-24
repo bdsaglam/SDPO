@@ -23,15 +23,20 @@ pip install word2number latex2sympy2 math-verify[antlr4_9_3]==0.8.0
 
 # Containerized usage
 
-# Recreate with --entrypoint="" so sleep infinity actually runs
+docker container stop sdpo
 docker rm sdpo
+
+# Recreate with --entrypoint="" so sleep infinity actually runs
+
 docker create --runtime=nvidia --gpus all --net=host --shm-size="10g" \
   --cap-add=SYS_ADMIN --entrypoint="" \
   --env-file .env \
   -v .:/workspace/sdpo --name sdpo \
+  -v ./.dspy_cache:/root/.dspy_cache \
   verlai/verl:vllm011.latest sleep infinity
 
 docker start sdpo
+
 docker exec -it sdpo bash
 
 # --- Inside the container ---
@@ -71,6 +76,93 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
   trainer.save_freq=10 \
   trainer.test_freq=10 \
   trainer.total_epochs=15 2>&1 | tee verl_demo.log
+
+
+# ARC-AGI SDPO
+
+docker container stop sdpo
+docker rm sdpo
+
+docker create --runtime=nvidia --gpus all --net=host --shm-size="10g" \
+  --cap-add=SYS_ADMIN --entrypoint="" \
+  --env-file .env \
+  -v .:/workspace/sdpo --name sdpo \
+  -v ./.dspy_cache:/root/.dspy_cache \
+  verlai/verl:vllm011.latest sleep infinity
+
+docker start sdpo
+
+docker exec -it sdpo bash
+
+# --- Inside the container ---
+
+cd /workspace/sdpo
+pip3 install --no-deps -e .
+pip3 install dspy
+
+## Data
+
+Raw ARC-AGI data lives in `datasets/arc_agi/` organized by year:
+- `datasets/arc_agi/2024/raw/` — ARC Prize 2024 (400 training, 400 evaluation)
+- `datasets/arc_agi/2025/raw/` — ARC Prize 2025 (placeholder)
+- `datasets/arc_agi/dummy/raw/` — 3-task dummy set for testing
+
+```sh
+# Prepare dummy dataset for testing
+python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/dummy/raw --output_dir datasets/arc_agi/dummy
+
+# Prepare 2024 dataset
+python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2024/raw --output_dir datasets/arc_agi/2024
+
+# Prepare 2025 dataset
+python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2025/raw --output_dir datasets/arc_agi/2025
+
+```
+
+## Training (4 GPUs, Qwen3-8B)
+
+```sh
+./run_arc_agi_sdpo.sh
+```
+
+## Architecture
+
+- **Model:** Qwen3-8B, single-turn REPL (reasoning + code + SUBMIT)
+- **Reward:** Balanced mode: `(2.0*exact_match + 0.5*cell_acc + 0.3*shape + 0.1*format) / 2.9`
+- **SDPO threshold:** 1.0 (only exact matches become peer solutions)
+- **Analysis:** Gemini (`gemini/gemini-3-flash-preview`) via DSPy, injected as hint before task grids
+  - Toggle: `arc_analysis.enabled=true/false` in config or CLI override
+- **Config:** `verl/trainer/config/arc_agi.yaml` (extends `sdpo.yaml`)
+  - 8K prompt, 16K response, 24K total context
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `data/format/arc_agi.py` | Dataset loader (SDPO schema from ARC JSON) |
+| `data/prepare_arc_agi.py` | Standalone data prep script |
+| `data/analysis/arc_agi_analyzer.py` | Gemini DSPy analyzer |
+| `verl/utils/reward_score/feedback/arc_agi.py` | Reward function + feedback |
+| `verl/utils/reward_score/feedback/subprocess_interpreter.py` | Subprocess code execution |
+| `verl/trainer/hooks/arc_analysis.py` | Pre-rollout Gemini hint injection |
+| `verl/trainer/config/arc_agi.yaml` | Hydra config |
+| `run_arc_agi_sdpo.sh` | Launch script |
+
+## Disable analysis hints
+
+```sh
+./run_arc_agi_sdpo.sh  # then append:
+# arc_analysis.enabled=false
+```
+
+Or override via CLI args in the launch script.
+
+## Verification checklist
+
+1. `python3 data/prepare_arc_agi.py` → produces `datasets/arc_agi/2024/{train,test}.{json,parquet}`
+2. Dry run: `trainer.val_only=True trainer.total_epochs=1`
+3. Short training: 2-3 epochs, check W&B for `reward/mean`, `teacher_kl`, `entropy`
+4. Check `self_distillation/success_sample_fraction` > 0 (some exact matches → peer solutions)
 
 
 # Experiments

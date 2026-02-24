@@ -9,6 +9,7 @@ from data.format.mmlu_pro import load_mmlu_pro
 from data.format.math import load_math
 from data.format.code import load_code
 from data.format.sciknoweval import load_sciknoweval
+from data.format.arc_agi import load_arc_agi
 from data.utils.data_handling import write_hf_to_json
 
 
@@ -53,6 +54,13 @@ def load_dataset_hf(
             levels=["L3"],
             types=["mcq-4-choices", "mcq-2-choices"],
         )
+    elif dataset_name == "arc_agi":
+        # arc_agi returns (train, eval) tuple; handled specially in prepare_arc_agi.py
+        # For direct use via load_dataset.py, return train split
+        train_ds, _eval_ds = load_arc_agi(
+            data_folder=category or "datasets/arc_agi/2024/raw",
+        )
+        ds = train_ds
     else:
         raise ValueError(f"Dataset {dataset_name} not supported.")
     ds = ds.add_column("idx", list(range(len(ds))))

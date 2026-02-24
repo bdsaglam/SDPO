@@ -137,3 +137,6 @@ Dockerfile.gh200-ofi
 DOCKER_PLAN_GH200.md
 .docker_env.sh
 .docker_rc.sh
+
+# DSPy LM call cache
+.dspy_cache/

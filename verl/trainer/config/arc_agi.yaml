@@ -1,0 +1,37 @@
+defaults:
+  - sdpo
+  - _self_
+
+# MAX_PROMPT_LENGTH=8192 (system prompt ~3K + task grids ~1K + analysis hint ~3K)
+# MAX_RESPONSE_LENGTH=16384
+# MAX_FEEDBACK_LENGTH=0 (single-turn, no environment feedback in prompt)
+# TEMPLATE_LENGTH=512
+# MAX_MODEL_LEN = 512 + 8192 + 16384 = 25088
+max_model_len: 24576
+
+data:
+  max_prompt_length: 8192
+  max_response_length: 16384
+  train_batch_size: 16
+
+actor_rollout_ref:
+  actor:
+    ppo_mini_batch_size: 16
+    self_distillation:
+      success_reward_threshold: 1.0
+      max_reprompt_len: 14336
+      reprompt_template: |-
+        {prompt}{solution}{feedback}
+
+        Correctly solve the ARC puzzle. Make sure to call SUBMIT() with your test predictions.
+  rollout:
+    n: 8
+    temperature: 0.7
+    val_kwargs:
+      n: 8
+      temperature: 0.6
+
+# ARC-specific analysis configuration
+arc_analysis:
+  enabled: true
+  model: "gemini/gemini-3-flash-preview"
