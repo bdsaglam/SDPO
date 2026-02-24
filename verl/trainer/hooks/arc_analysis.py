@@ -11,7 +11,6 @@ import logging
 from typing import Any
 
 import numpy as np
-import torch
 
 logger = logging.getLogger(__name__)
 
@@ -128,64 +127,4 @@ def inject_analysis(
                 modified = True
                 break
 
-    if modified:
-        # Re-tokenize all prompts to update input_ids
-        _retokenize_batch(batch, tokenizer, config)
-
     return batch, cache
-
-
-def _retokenize_batch(batch, tokenizer, config):
-    """Re-tokenize raw_prompt messages into input_ids/attention_mask.
-
-    This updates the batch's tensor data in-place after prompt modification.
-    """
-    batch_size = len(batch.non_tensor_batch["raw_prompt"])
-    apply_kwargs = {}
-    if config.data.get("apply_chat_template_kwargs"):
-        apply_kwargs.update(config.data.apply_chat_template_kwargs)
-
-    all_input_ids = []
-    all_attention_mask = []
-
-    max_prompt_length = config.data.get("max_prompt_length", 8192)
-
-    for i in range(batch_size):
-        messages = list(batch.non_tensor_batch["raw_prompt"][i])
-
-        tokenized = tokenizer.apply_chat_template(
-            messages,
-            tokenize=True,
-            return_tensors="pt",
-            return_dict=True,
-            add_generation_prompt=True,
-            max_length=max_prompt_length,
-            truncation=True,
-            **apply_kwargs,
-        )
-        all_input_ids.append(tokenized["input_ids"].squeeze(0))
-        all_attention_mask.append(tokenized["attention_mask"].squeeze(0))
-
-    # Pad to same length
-    max_len = max(ids.shape[0] for ids in all_input_ids)
-    pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
-
-    padded_input_ids = torch.full((batch_size, max_len), pad_id, dtype=all_input_ids[0].dtype)
-    padded_attention_mask = torch.zeros((batch_size, max_len), dtype=all_attention_mask[0].dtype)
-
-    for i, (ids, mask) in enumerate(zip(all_input_ids, all_attention_mask)):
-        # Left-pad (tokenizer.padding_side is "left")
-        pad_len = max_len - ids.shape[0]
-        padded_input_ids[i, pad_len:] = ids
-        padded_attention_mask[i, pad_len:] = mask
-
-    # Update batch tensors
-    device = batch.batch["input_ids"].device if "input_ids" in batch.batch else "cpu"
-    batch.batch["input_ids"] = padded_input_ids.to(device)
-    batch.batch["attention_mask"] = padded_attention_mask.to(device)
-
-    # Update position_ids if present
-    if "position_ids" in batch.batch:
-        position_ids = padded_attention_mask.long().cumsum(dim=-1) - 1
-        position_ids = position_ids.clamp(min=0)
-        batch.batch["position_ids"] = position_ids.to(device)

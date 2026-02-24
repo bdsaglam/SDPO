@@ -3,8 +3,9 @@
 Produces the standard SDPO schema (idx, kind, dataset, prompt, answer, tests,
 description, elo, system) from ARC-AGI challenge/solution JSON files.
 
-Analysis hints are NOT included here — they are injected dynamically during
-training via the arc_analysis hook.
+Analysis hints can be baked in at data-preparation time by placing
+``arc-agi_{split}_hints.json`` files in the data folder (see
+``prepare_arc_agi.py``).
 """
 
 from __future__ import annotations
@@ -195,7 +196,7 @@ print(format_grid(task["train"][0]["output"]))
 
 
 def load_arc_agi(
-    data_folder: str,
+    data_folder: Path,
     train_split: str = "training",
     eval_split: str = "evaluation",
 ) -> tuple[Dataset, Dataset]:
@@ -209,10 +210,8 @@ def load_arc_agi(
     Returns:
         (train_dataset, eval_dataset) with SDPO standard schema.
     """
-    base = Path(data_folder)
-
-    train_ds = _load_split(base, train_split)
-    eval_ds = _load_split(base, eval_split)
+    train_ds = _load_split(data_folder, train_split)
+    eval_ds = _load_split(data_folder, eval_split)
 
     return train_ds, eval_ds
 

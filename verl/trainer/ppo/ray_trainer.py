@@ -1627,16 +1627,6 @@ class RayPPOTrainer:
                     [str(uuid.uuid4()) for _ in range(len(batch.batch))], dtype=object
                 )
 
-                # ARC-AGI analysis hook: inject Gemini hints into prompts
-                if hasattr(self.config, "arc_analysis") and self.config.arc_analysis.get("enabled", False):
-                    from verl.trainer.hooks.arc_analysis import inject_analysis
-
-                    if not hasattr(self, "_analysis_cache"):
-                        self._analysis_cache = {}
-                    batch, self._analysis_cache = inject_analysis(
-                        batch, self.config, self.tokenizer, self._analysis_cache
-                    )
-
                 gen_batch = self._get_gen_batch(batch)
 
                 # pass global_steps to trace

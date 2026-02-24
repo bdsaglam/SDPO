@@ -31,6 +31,7 @@ SUFFIX=${1:-"local_sdpo"}
 
 # Get the directory where this script is located
 export PROJECT_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+export SDPO_DIR="$PROJECT_ROOT"
 export PYTHONPATH=$PROJECT_ROOT:$PYTHONPATH
 
 # Define USER for Hydra config (required by user.yaml)

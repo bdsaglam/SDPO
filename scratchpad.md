@@ -26,13 +26,12 @@ pip install word2number latex2sympy2 math-verify[antlr4_9_3]==0.8.0
 docker container stop sdpo
 docker rm sdpo
 
-# Recreate with --entrypoint="" so sleep infinity actually runs
-
 docker create --runtime=nvidia --gpus all --net=host --shm-size="10g" \
   --cap-add=SYS_ADMIN --entrypoint="" \
   --env-file .env \
   -v .:/workspace/sdpo --name sdpo \
   -v ./.dspy_cache:/root/.dspy_cache \
+  -v ~/.cache/huggingface:/root/.cache/huggingface \
   verlai/verl:vllm011.latest sleep infinity
 
 docker start sdpo
@@ -88,6 +87,7 @@ docker create --runtime=nvidia --gpus all --net=host --shm-size="10g" \
   --env-file .env \
   -v .:/workspace/sdpo --name sdpo \
   -v ./.dspy_cache:/root/.dspy_cache \
+  -v ~/.cache/huggingface:/root/.cache/huggingface \
   verlai/verl:vllm011.latest sleep infinity
 
 docker start sdpo
@@ -98,7 +98,7 @@ docker exec -it sdpo bash
 
 cd /workspace/sdpo
 pip3 install --no-deps -e .
-pip3 install dspy
+pip3 install dspy math-verify
 
 ## Data
 
@@ -109,13 +109,16 @@ Raw ARC-AGI data lives in `datasets/arc_agi/` organized by year:
 
 ```sh
 # Prepare dummy dataset for testing
-python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/dummy/raw --output_dir datasets/arc_agi/dummy
+python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/dummy
 
 # Prepare 2024 dataset
-python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2024/raw --output_dir datasets/arc_agi/2024
+python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2024
+
+# Prepare 2024 dataset with hints
+python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2024-with-hints
 
 # Prepare 2025 dataset
-python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2025/raw --output_dir datasets/arc_agi/2025
+python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2025
 
 ```
 
@@ -165,4 +168,5 @@ Or override via CLI args in the launch script.
 4. Check `self_distillation/success_sample_fraction` > 0 (some exact matches → peer solutions)
 
 
-# Experiments
+# Miscellaneous
+rsync -avP 144.122.52.26:~/.cache/huggingface/hub/ ~/.cache/huggingface/hub/

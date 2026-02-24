@@ -4,16 +4,28 @@
 Loads ARC challenge/solution JSON files, formats them into SDPO schema,
 and produces train/test JSON + parquet files.
 
+If ``arc-agi_training_hints.json`` / ``arc-agi_evaluation_hints.json``
+(mapping task_id → analysis text) exist in the data folder, analysis hints
+are prepended to prompts and tasks without hints are discarded.
+
 Usage:
+    # Without hints (all tasks)
     python data/prepare_arc_agi.py \
-        --data_folder /path/to/arc-prize-2024 \
+        --data_folder datasets/arc_agi/2024/raw \
         --output_dir datasets/arc_agi/2024
+
+    # With hints (place hint files in raw/, output to separate dir)
+    python data/prepare_arc_agi.py \
+        --data_folder datasets/arc_agi/2024/raw \
+        --output_dir datasets/arc_agi/2024-with-hints
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
+from pathlib import Path
 
 import numpy as np
 
@@ -22,26 +34,55 @@ from data.preprocess import run_proprocessing
 from data.utils.data_handling import write_hf_to_json
 
 
+def _inject_analysis(dataset, analysis: dict):
+    """Prepend analysis hints to prompts and filter to tasks with analysis."""
+    # Filter to tasks that have analysis entries
+    dataset = dataset.filter(lambda ex: ex["task_id"] in analysis)
+
+    def prepend_hint(ex):
+        hint = analysis[ex["task_id"]]
+        ex["prompt"] = f"**Analysis Hint:**\n{hint}\n\n---\n\n{ex['prompt']}"
+        return ex
+
+    return dataset.map(prepend_hint)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Prepare ARC-AGI dataset for SDPO training.")
     parser.add_argument(
         "--data_folder",
         type=str,
-        default="datasets/arc_agi/2024/raw",
-        help="Path to the directory containing arc-agi_*_challenges.json and arc-agi_*_solutions.json files.",
-    )
-    parser.add_argument(
-        "--output_dir",
-        type=str,
         default="datasets/arc_agi/2024",
-        help="Output directory for train/test JSON and parquet files.",
+        help="Path to the directory containing arc-agi_*_challenges.json and arc-agi_*_solutions.json files.",
     )
     args = parser.parse_args()
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    # Auto-detect per-split hint files
+    def _load_hints(split_name):
+        path = os.path.join(args.data_folder, f"arc-agi_{split_name}_hints.json")
+        if os.path.exists(path):
+            with open(path) as f:
+                hints = json.load(f)
+            print(f"Loaded {len(hints)} hints from {path}")
+            return hints
+        return None
+
+    train_hints = _load_hints("training")
+    eval_hints = _load_hints("evaluation")
 
     print(f"Loading ARC-AGI data from {args.data_folder}")
-    train_ds, eval_ds = load_arc_agi(args.data_folder)
+    data_folder = Path(args.data_folder)
+    train_ds, eval_ds = load_arc_agi(data_folder / "raw")
+
+    # Inject hints and filter to tasks with hints
+    if train_hints is not None:
+        before = len(train_ds)
+        train_ds = _inject_analysis(train_ds, train_hints)
+        print(f"Train after hint filter: {before}->{len(train_ds)}")
+    if eval_hints is not None:
+        before = len(eval_ds)
+        eval_ds = _inject_analysis(eval_ds, eval_hints)
+        print(f"Eval after hint filter: {before}->{len(eval_ds)}")
 
     # Add idx column
     train_ds = train_ds.add_column("idx", list(range(len(train_ds))))
@@ -64,16 +105,19 @@ def main():
     print(f"Columns: {train_ds.column_names}")
 
     # Write JSON
-    train_path = os.path.join(args.output_dir, "train.json")
-    test_path = os.path.join(args.output_dir, "test.json")
-    write_hf_to_json(train_ds, train_path)
-    write_hf_to_json(eval_ds, test_path)
+    train_path = data_folder / "train.json"  
+    test_path = data_folder / "test.json"
+    write_hf_to_json(train_ds, str(train_path))
+    write_hf_to_json(eval_ds, str(test_path))
     print(f"Wrote {train_path} and {test_path}")
 
     # Run preprocessing to produce parquet
-    print("Running preprocessing to produce parquet files...")
-    run_proprocessing(args.output_dir, num_proc=1)
-    print("Done!")
+    if len(train_ds) == 0 and len(eval_ds) == 0:
+        print("No tasks found — skipping parquet preprocessing.")
+    else:
+        print("Running preprocessing to produce parquet files...")
+        run_proprocessing(str(data_folder), num_proc=1)
+        print("Done!")
 
 
 if __name__ == "__main__":
