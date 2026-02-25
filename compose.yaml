@@ -1,0 +1,25 @@
+services:
+  sdpo:
+    build:
+      context: .
+      dockerfile: Dockerfile.sdpo
+    container_name: sdpo
+    entrypoint: ["/workspace/sdpo/entrypoint.sh"]
+    command: ["sleep", "infinity"]
+    runtime: nvidia
+    shm_size: "10g"
+    cap_add:
+      - SYS_ADMIN
+    network_mode: host
+    env_file: .env
+    volumes:
+      - .:/workspace/sdpo
+      - ./.dspy_cache:/root/.dspy_cache
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

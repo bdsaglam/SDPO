@@ -79,26 +79,23 @@ PYTHONUNBUFFERED=1 python3 -m verl.trainer.main_ppo \
 
 # ARC-AGI SDPO
 
-docker container stop sdpo
-docker rm sdpo
+Uses `docker compose` with `Dockerfile.sdpo` (extends `verlai/verl:vllm011.latest`, pre-installs `dspy` and `math-verify`) and `entrypoint.sh` (runs `pip install --no-deps -e .` on startup).
 
-docker create --runtime=nvidia --gpus all --net=host --shm-size="10g" \
-  --cap-add=SYS_ADMIN --entrypoint="" \
-  --env-file .env \
-  -v .:/workspace/sdpo --name sdpo \
-  -v ./.dspy_cache:/root/.dspy_cache \
-  -v ~/.cache/huggingface:/root/.cache/huggingface \
-  verlai/verl:vllm011.latest sleep infinity
+```sh
+# One-time build (re-run only if Dockerfile.sdpo changes)
+docker compose build
 
-docker start sdpo
+# Start container
+docker compose up -d
 
-docker exec -it sdpo bash
+# Shell into it — ready to go, no manual pip installs needed
+docker compose exec sdpo bash
 
-# --- Inside the container ---
+# Stop & clean up
+docker compose down
+```
 
-cd /workspace/sdpo
-pip3 install --no-deps -e .
-pip3 install dspy math-verify
+Inside the container:
 
 ## Data
 
