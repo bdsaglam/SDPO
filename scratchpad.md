@@ -134,7 +134,6 @@ python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2025
 - **Reward:** Balanced mode: `(2.0*exact_match + 0.5*cell_acc + 0.3*shape + 0.1*format) / 2.9`
 - **SDPO threshold:** 1.0 (only exact matches become peer solutions)
 - **Analysis:** Gemini (`gemini/gemini-3-flash-preview`) via DSPy, injected as hint before task grids
-  - Toggle: `arc_analysis.enabled=true/false` in config or CLI override
 - **Config:** `verl/trainer/config/arc_agi.yaml` (extends `sdpo.yaml`)
   - 8K prompt, 16K response, 24K total context
 
@@ -154,8 +153,7 @@ python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2025
 ## Disable analysis hints
 
 ```sh
-./run_arc_agi_sdpo.sh  # then append:
-# arc_analysis.enabled=false
+./run_arc_agi_sdpo.sh 
 ```
 
 Or override via CLI args in the launch script.

@@ -28,6 +28,9 @@ export SDPO_DIR="$PROJECT_ROOT"
 export PYTHONPATH=$PROJECT_ROOT:$PYTHONPATH
 export USER=${USER:-$(whoami)}
 
+# Direct file logger output into outputs/ instead of project root
+export VERL_FILE_LOGGER_ROOT="$PROJECT_ROOT/outputs/logs"
+
 # =============================================================================
 # EXECUTION
 # =============================================================================
@@ -43,7 +46,9 @@ actor_rollout_ref.actor.optim.lr=$LR \
 actor_rollout_ref.actor.ppo_mini_batch_size=$TRAIN_BATCH_SIZE \
 actor_rollout_ref.actor.optim.lr_warmup_steps=10 \
 algorithm.rollout_correction.rollout_is=token \
-actor_rollout_ref.rollout.val_kwargs.n=8"
+actor_rollout_ref.rollout.val_kwargs.n=8 \
+trainer.rollout_data_dir=rollouts \
+trainer.validation_data_dir=val_rollouts"
 
 echo "----------------------------------------------------------------"
 echo "Starting ARC-AGI GRPO Training"

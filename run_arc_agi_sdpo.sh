@@ -36,6 +36,9 @@ export PYTHONPATH=$PROJECT_ROOT:$PYTHONPATH
 # Define USER for Hydra config (required by user.yaml)
 export USER=${USER:-$(whoami)}
 
+# Direct file logger output into outputs/ instead of project root
+export VERL_FILE_LOGGER_ROOT="$PROJECT_ROOT/outputs/logs"
+
 # =============================================================================
 # EXECUTION
 # =============================================================================
@@ -43,6 +46,8 @@ export USER=${USER:-$(whoami)}
 MODEL_NAME=$(echo "$MODEL_PATH" | tr '/' '-')
 EXP_NAME="ARC-SDPO-train${TRAIN_BATCH_SIZE}-rollout${ROLLOUT_N}-lr${LR}-threshold${SUCCESS_THRESHOLD}-${MODEL_NAME}-${SUFFIX}"
 
+# Dump rollout trajectories into Hydra's run dir (outputs/<date>/<time>/)
+# Using Hydra's interpolation so paths resolve to the same directory Hydra creates
 ARGS="data.train_batch_size=$TRAIN_BATCH_SIZE \
 trainer.group_name=ARC-SDPO \
 actor_rollout_ref.rollout.n=$ROLLOUT_N \
@@ -54,9 +59,12 @@ actor_rollout_ref.actor.self_distillation.alpha=$ALPHA \
 actor_rollout_ref.actor.self_distillation.distillation_topk=100 \
 actor_rollout_ref.actor.self_distillation.dont_reprompt_on_self_success=${DONTS_REPROMPT_ON_SELF_SUCCESS} \
 actor_rollout_ref.actor.optim.lr_warmup_steps=10 \
+actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=2 \
 algorithm.rollout_correction.rollout_is=token \
 actor_rollout_ref.rollout.val_kwargs.n=8 \
-trainer.logger=['console','file']"
+trainer.logger=['console','file'] \
+trainer.rollout_data_dir=rollouts \
+trainer.validation_data_dir=val_rollouts"
 
 echo "----------------------------------------------------------------"
 echo "Starting ARC-AGI SDPO Training"

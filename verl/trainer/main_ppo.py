@@ -42,6 +42,13 @@ def main(config):
     # Automatically set `config.trainer.device = npu` when running on Ascend NPU.
     auto_set_device(config)
 
+    # Resolve rollout/validation dump dirs relative to Hydra's output directory
+    hydra_output_dir = hydra.core.hydra_config.HydraConfig.get().runtime.output_dir
+    for key in ("rollout_data_dir", "validation_data_dir"):
+        val = config.trainer.get(key, None)
+        if val and not os.path.isabs(val):
+            OmegaConf.update(config, f"trainer.{key}", os.path.join(hydra_output_dir, val))
+
     run_ppo(config)
 
 

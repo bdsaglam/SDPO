@@ -110,14 +110,15 @@ def recv():
 config = recv()
 
 # Execute sandbox code if provided
+_sandbox_error = None
 if config.get("sandbox_code"):
     try:
         exec(config["sandbox_code"], namespace)
     except Exception as e:
-        pass  # Sandbox code failure is non-fatal during setup
+        _sandbox_error = f"{type(e).__name__}: {e}"
 
-# Signal ready
-send({"ready": True})
+# Signal ready (include sandbox error if any, so caller can log it)
+send({"ready": True, **({"sandbox_error": _sandbox_error} if _sandbox_error else {})})
 
 # Main REPL loop
 while True:
@@ -212,6 +213,8 @@ class SubprocessInterpreter:
         response = self._recv()
         if not response.get("ready"):
             raise CodeInterpreterError(f"Subprocess failed to start: {response}")
+        if response.get("sandbox_error"):
+            raise CodeInterpreterError(f"Sandbox initialization failed: {response['sandbox_error']}")
 
         self._started = True
 

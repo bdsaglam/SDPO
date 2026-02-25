@@ -1793,6 +1793,13 @@ class RayPPOTrainer:
                         if reward_extra_infos_dict:
                             batch.non_tensor_batch.update({k: np.array(v) for k, v in reward_extra_infos_dict.items()})
 
+                            # Log reward diagnostics so silent failures are visible in WandB
+                            for diag_key in ("error", "no_submission", "cell_accuracy", "shape_match", "acc"):
+                                if diag_key in reward_extra_infos_dict:
+                                    vals = reward_extra_infos_dict[diag_key]
+                                    if vals:
+                                        metrics[f"reward_diag/{diag_key}_mean"] = float(np.mean(vals))
+
                         # compute rewards. apply_kl_penalty if available
                         if self.config.algorithm.use_kl_in_reward:
                             batch, kl_metrics = apply_kl_penalty(

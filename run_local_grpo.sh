@@ -33,6 +33,9 @@ export PYTHONPATH=$PROJECT_ROOT:$PYTHONPATH
 # Define USER for Hydra config (required by user.yaml)
 export USER=${USER:-$(whoami)}
 
+# Direct file logger output into outputs/ instead of project root
+export VERL_FILE_LOGGER_ROOT="$PROJECT_ROOT/outputs/logs"
+
 # =============================================================================
 # EXECUTION
 # =============================================================================
@@ -47,7 +50,9 @@ actor_rollout_ref.actor.optim.lr=$LR \
 actor_rollout_ref.actor.ppo_mini_batch_size=$MINI_BATCH_SIZE \
 actor_rollout_ref.model.path=$MODEL_PATH \
 algorithm.rollout_correction.rollout_is=token \
-actor_rollout_ref.rollout.val_kwargs.n=16"
+actor_rollout_ref.rollout.val_kwargs.n=16 \
+trainer.rollout_data_dir=rollouts \
+trainer.validation_data_dir=val_rollouts"
 
 echo "----------------------------------------------------------------"
 echo "Starting Local GRPO Training"
