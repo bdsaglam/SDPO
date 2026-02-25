@@ -1,0 +1,4 @@
+interaction:
+  - name: "arc_agi"
+    class_name: "verl.interactions.arc_agi_interaction.ArcAgiInteraction"
+    config: {}

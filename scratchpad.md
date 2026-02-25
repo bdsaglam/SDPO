@@ -119,20 +119,50 @@ python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2025
 
 ```
 
-## Training (4 GPUs, Qwen3-8B)
+## Training — Single-Turn (4 GPUs, Qwen3-8B)
 
 ```sh
 ./run_arc_agi_sdpo.sh
 ```
 
+## Training — Multi-Turn REPL (4 GPUs, Qwen3-8B)
+
+The model gets a persistent REPL: it generates code, sees stdout/stderr, and can iterate before calling SUBMIT(). Uses verl's `ToolAgentLoop` + `ArcAgiInteraction`.
+
+```sh
+# Re-prepare data first (adds interaction_kwargs to parquet)
+python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2024-with-hints
+
+# Run multi-turn training (default 8 turns)
+./run_arc_agi_sdpo_multiturn.sh
+
+# Override max turns via env var
+MAX_TURNS=4 ./run_arc_agi_sdpo_multiturn.sh
+```
+
+Multi-turn flow per rollout:
+1. Model generates `[[ ## code ## ]]` block
+2. `ArcAgiInteraction` executes code in persistent subprocess
+3. stdout/stderr returned as next user message (not trained on)
+4. Model sees output, generates more code
+5. Repeat until `SUBMIT()` or max turns reached
+
+Key differences from single-turn:
+- `data.return_raw_chat=True`, `multi_turn.enable=True`
+- Larger token budget: 24K response, 32K total context
+- `interaction_config_path=config/arc_agi_interaction_config.yaml`
+
 ## Architecture
 
-- **Model:** Qwen3-8B, single-turn REPL (reasoning + code + SUBMIT)
+- **Model:** Qwen3-8B
+- **Single-turn:** reasoning + code + SUBMIT in one shot
+- **Multi-turn:** persistent REPL, up to 8 turns of code execution before SUBMIT
 - **Reward:** Balanced mode: `(2.0*exact_match + 0.5*cell_acc + 0.3*shape + 0.1*format) / 2.9`
 - **SDPO threshold:** 1.0 (only exact matches become peer solutions)
 - **Analysis:** Gemini (`gemini/gemini-3-flash-preview`) via DSPy, injected as hint before task grids
 - **Config:** `verl/trainer/config/arc_agi.yaml` (extends `sdpo.yaml`)
-  - 8K prompt, 16K response, 24K total context
+  - Single-turn: 8K prompt, 16K response, 24K total context
+  - Multi-turn: 8K prompt, 24K response, 32K total context
 
 ## Key files
 
@@ -143,14 +173,17 @@ python3 data/prepare_arc_agi.py --data_folder datasets/arc_agi/2025
 | `data/analysis/arc_agi_analyzer.py` | Gemini DSPy analyzer |
 | `verl/utils/reward_score/feedback/arc_agi.py` | Reward function + feedback |
 | `verl/utils/reward_score/feedback/subprocess_interpreter.py` | Subprocess code execution |
+| `verl/interactions/arc_agi_interaction.py` | Multi-turn REPL interaction (persistent subprocess per rollout) |
+| `config/arc_agi_interaction_config.yaml` | Interaction registry config |
 | `verl/trainer/hooks/arc_analysis.py` | Pre-rollout Gemini hint injection |
 | `verl/trainer/config/arc_agi.yaml` | Hydra config |
-| `run_arc_agi_sdpo.sh` | Launch script |
+| `run_arc_agi_sdpo.sh` | Single-turn launch script |
+| `run_arc_agi_sdpo_multiturn.sh` | Multi-turn launch script |
 
 ## Disable analysis hints
 
 ```sh
-./run_arc_agi_sdpo.sh 
+./run_arc_agi_sdpo.sh
 ```
 
 Or override via CLI args in the launch script.
@@ -161,7 +194,12 @@ Or override via CLI args in the launch script.
 2. Dry run: `trainer.val_only=True trainer.total_epochs=1`
 3. Short training: 2-3 epochs, check W&B for `reward/mean`, `teacher_kl`, `entropy`
 4. Check `self_distillation/success_sample_fraction` > 0 (some exact matches → peer solutions)
+5. Multi-turn: check `__num_turns__` > 2 in metrics, `turn_scores` in rollout dumps
 
+python tests/test_arc_agi_reward.py
 
 # Miscellaneous
 rsync -avP 144.122.52.26:~/.cache/huggingface/hub/ ~/.cache/huggingface/hub/
+
+rsync -avP 144.122.52.26:/home/baris/repos/epiq/output/runs/2026-02-24_19-18-37/arc-agi_training_hints.json /home/baris/repos/SDPO/datasets/arc_agi/2024-with-hints/raw/arc-agi_training_hints.json
+

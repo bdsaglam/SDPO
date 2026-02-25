@@ -79,6 +79,12 @@ def make_map_fn(split: str):
                 "achievement_prior": achievement_prior
             }
 
+            if reward_style == "arc_agi":
+                extra_info["interaction_kwargs"] = {
+                    "name": "arc_agi",
+                    "ground_truth": solution,
+                }
+
             if system is not None:
                 messages = [{
                     "role": "system",

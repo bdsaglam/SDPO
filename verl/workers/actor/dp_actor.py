@@ -382,7 +382,20 @@ class DataParallelPPOActor(BasePPOActor):
                                     topk_indices_rmpad.unsqueeze(0), dim=1, padding=True
                                 ).squeeze(0)
                             topk_logits_rmpad = torch.gather(logits_rmpad, dim=-1, index=topk_indices_rmpad)
-                        logsumexp_rmpad = torch.logsumexp(logits_rmpad, dim=-1, keepdim=True)
+                        # Chunk logsumexp along token dim to avoid OOM from the
+                        # full (total_nnz, vocab_size) fp32 intermediate that
+                        # torch.logsumexp allocates internally.
+                        _LSE_CHUNK = 4096
+                        if logits_rmpad.shape[0] > _LSE_CHUNK:
+                            logsumexp_rmpad = torch.cat(
+                                [
+                                    torch.logsumexp(logits_rmpad[i : i + _LSE_CHUNK], dim=-1, keepdim=True)
+                                    for i in range(0, logits_rmpad.shape[0], _LSE_CHUNK)
+                                ],
+                                dim=0,
+                            )
+                        else:
+                            logsumexp_rmpad = torch.logsumexp(logits_rmpad, dim=-1, keepdim=True)
                         topk_logps_rmpad = topk_logits_rmpad - logsumexp_rmpad
 
                     # Compute sum_pi_squared if requested (for optimal_token_baseline)

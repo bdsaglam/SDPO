@@ -74,6 +74,13 @@ class Tracking:
             wandb.init(project=project_name, name=experiment_name, entity=entity, config=config, settings=settings, group=group_name)
             self.logger["wandb"] = wandb
 
+            try:
+                import weave
+
+                weave.init(project_name)
+            except ImportError:
+                pass
+
         if "trackio" in default_backend:
             import trackio
 
