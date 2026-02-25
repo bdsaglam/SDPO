@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 
 import numpy as np
@@ -39,12 +38,12 @@ def _inject_analysis(dataset, analysis: dict):
     # Filter to tasks that have analysis entries
     dataset = dataset.filter(lambda ex: ex["task_id"] in analysis)
 
-    def prepend_hint(ex):
+    def append_hint(ex):
         hint = analysis[ex["task_id"]]
-        ex["prompt"] = f"**Analysis Hint:**\n{hint}\n\n---\n\n{ex['prompt']}"
+        ex["prompt"] = ex["prompt"] + f"\n\n**Hint:**\n{hint}"
         return ex
 
-    return dataset.map(prepend_hint)
+    return dataset.map(append_hint)
 
 
 def main():
@@ -57,12 +56,13 @@ def main():
     )
     args = parser.parse_args()
 
+    data_folder = Path(args.data_folder)
+
     # Auto-detect per-split hint files
     def _load_hints(split_name):
-        path = os.path.join(args.data_folder, f"arc-agi_{split_name}_hints.json")
-        if os.path.exists(path):
-            with open(path) as f:
-                hints = json.load(f)
+        path = data_folder / "raw" / f"arc-agi_{split_name}_hints.json"
+        if path.exists():
+            hints = json.loads(path.read_text())
             print(f"Loaded {len(hints)} hints from {path}")
             return hints
         return None
@@ -70,8 +70,7 @@ def main():
     train_hints = _load_hints("training")
     eval_hints = _load_hints("evaluation")
 
-    print(f"Loading ARC-AGI data from {args.data_folder}")
-    data_folder = Path(args.data_folder)
+    print(f"Loading ARC-AGI data from {data_folder}")
     train_ds, eval_ds = load_arc_agi(data_folder / "raw")
 
     # Inject hints and filter to tasks with hints
